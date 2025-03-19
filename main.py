@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
-from app.core.database import create_connection_pool, close_connection_pool
+from app.core.dbconn import create_connection_pool, close_connection_pool
 from app.api.routes import api_router
 from app.core.logging import logger
 
