@@ -1,9 +1,12 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
-
+import logging
+import traceback
 from app.core.dbconn import get_pool
 from app.services.search_service import search_organizations
 from app.models.organization import SearchParams, SearchResponse, PaginatedResponse
+
+logger = logging.getLogger("app.search")
 
 router = APIRouter()
 
