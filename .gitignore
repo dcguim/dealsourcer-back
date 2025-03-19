@@ -40,6 +40,8 @@ ENV/
 .settings/
 *.sublime-workspace
 *.sublime-project
+*.~
+nohup.out
 
 # Logs
 logs/
