@@ -24,43 +24,38 @@ async def search_orgs(
     """
     Search for organizations using various criteria
     """
-    try:
-        logger.info(f"Search parameters: name={search_params.name}, description={search_params.description}")
-        # Validate that at least one search parameter is provided
-        if not any([name, description, jurisdiction, legal_form, status]):
-            raise HTTPException(
-                status_code=400, 
-                detail="At least one search parameter must be provided"
-            )
-    
-        # Create search parameters object
-        search_params = SearchParams(
-            name=name,
-            description=description,
-            jurisdiction=jurisdiction,
-            legal_form=legal_form,
-            status=status,
-            limit=limit,
-            offset=offset
+    # Validate that at least one search parameter is provided
+    if not any([name, description, jurisdiction, legal_form, status]):
+        raise HTTPException(
+            status_code=400, 
+            detail="At least one search parameter must be provided"
         )
+    
+    # Create search parameters object
+    search_params = SearchParams(
+        name=name,
+        description=description,
+        jurisdiction=jurisdiction,
+        legal_form=legal_form,
+        status=status,
+        limit=limit,
+        offset=offset
+    )
+    
+    try:
+        # Execute search
+        results, total_count = await search_organizations(pool, search_params)
         
-        try:
-            # Execute search
-            results, total_count = await search_organizations(pool, search_params)
-            
-            # Create response
-            return SearchResponse(
-                results=results,
-                pagination=PaginatedResponse(
-                    total=total_count,
-                    limit=limit,
-                    offset=offset,
-                    has_more=(offset + limit) < total_count
-                )
+        # Create response
+        return SearchResponse(
+            results=results,
+            pagination=PaginatedResponse(
+                total=total_count,
+                limit=limit,
+                offset=offset,
+                has_more=(offset + limit) < total_count
             )
-        
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        )
+    
     except Exception as e:
-        logger.error(f"Search error: {str(e)}\n{traceback.format_exc()}")
-        raise
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
