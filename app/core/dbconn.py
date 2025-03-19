@@ -1,4 +1,5 @@
 import asyncpg
+import logging
 from .config import settings
 
 # Database connection pool
