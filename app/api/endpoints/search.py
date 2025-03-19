@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 
-from app.core.database import get_pool
+from app.core.dbconn import get_pool
 from app.services.search_service import search_organizations
 from app.models.organization import SearchParams, SearchResponse, PaginatedResponse
 

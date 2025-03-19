@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Path, HTTPException
 
-from app.core.database import get_pool
+from app.core.dbconn import get_pool
 from app.services.search_service import get_organization_by_id
 from app.models.organization import OrganizationResponse
 

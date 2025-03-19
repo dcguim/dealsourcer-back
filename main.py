@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.database import create_connection_pool, close_connection_pool
+from app.core.dbconn import create_connection_pool, close_connection_pool
 from app.api.routes import api_router
 
 # Create FastAPI application
