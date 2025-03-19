@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.dbconn import get_pool
-from app.services.search_service import get_statistics
+from app.services.search_service import get_organization_statistics
+
 from app.models.organization import StatsResponse
 
 router = APIRouter()
@@ -14,7 +15,7 @@ async def get_stats(
     Get basic statistics about the database
     """
     try:
-        stats = await get_statistics(pool)
+        stats = await get_organization_statistics(pool)
         return stats
     
     except Exception as e:

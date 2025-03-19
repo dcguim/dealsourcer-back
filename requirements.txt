@@ -1,8 +1,21 @@
-# Update requirements.txt
-fastapi==0.104.1
-uvicorn[standard]==0.23.2
-pydantic==1.10.8
-email-validator==2.1.0
-# Use an older version compatible with pydantic 1.x
-python-dotenv==1.0.0
+anyio==3.7.1
 asyncpg==0.29.0
+click==8.1.8
+dnspython==2.7.0
+email-validator==2.1.0
+fastapi==0.104.1
+h11==0.14.0
+httptools==0.6.4
+idna==3.10
+psycopg2-binary==2.9.10
+pydantic==1.10.8
+python-dotenv==1.0.0
+PyYAML==6.0.2
+sniffio==1.3.1
+starlette==0.27.0
+typing_extensions==4.12.2
+uvicorn==0.23.2
+uvloop==0.21.0
+watchfiles==1.0.4
+websockets==15.0.1
+

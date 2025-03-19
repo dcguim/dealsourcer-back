@@ -2,9 +2,9 @@ import time
 import traceback
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
-
 from app.core.config import settings
 from app.core.dbconn import create_connection_pool, close_connection_pool
 from app.api.routes import api_router
@@ -33,18 +33,27 @@ app.include_router(api_router)
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request, exc):
     logger.error(f"HTTP error: {exc.detail}")
-    return {"detail": exc.detail}
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
     logger.error(f"Validation error: {exc}")
-    return {"detail": str(exc)}
+    return JSONResponse(
+        status_code=422,
+        content={"detail": str(exc)}
+    )
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
     error_detail = f"Unexpected error: {str(exc)}\n{traceback.format_exc()}"
     logger.error(error_detail)
-    return {"detail": str(exc)}
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)}
+    )
 
 # Startup and shutdown events
 @app.on_event("startup")

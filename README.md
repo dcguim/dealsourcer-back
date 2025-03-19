@@ -57,8 +57,9 @@ cd organization-search-api
 2. **Create a virtual environment**
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+brew install python@3.11
+python3.11 -m venv venv311
+
 ```
 
 3. **Install dependencies**
