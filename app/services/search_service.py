@@ -1,18 +1,148 @@
 from typing import List, Dict, Any, Tuple, Optional
 from asyncpg.pool import Pool
 import logging
-from psycopg2 import sql
 import pdb
+from psycopg2 import sql
 from app.models.organization import SearchParams
+import time
 
 logger = logging.getLogger(__name__)
 
-import asyncpg
-from psycopg2 import sql
-from typing import List, Dict, Any, Tuple
+async def search_organizations_advanced(
+    pool: Pool, 
+    search_params: SearchParams
+) -> Tuple[List[Dict[str, Any]], int]:
+    """
+    Perform comprehensive full-text search on organizations.
+    """
+    start_time = time.time()
+    
+    # Validate input parameters
+    limit = max(1, min(search_params.limit, 100))
+    offset = max(0, search_params.offset)
+    
+    # Prepare dynamic search conditions
+    where_conditions = []
+    query_params = []
+    
+    # Process name and description searches - these work with textsearch column
+    name_search_terms = []
+    if search_params.name:
+        name_search_terms.append(search_params.name)
+    if search_params.description:
+        name_search_terms.append(search_params.description)
+    if search_params.participant_name:
+        name_search_terms.append(search_params.participant_name)
+    
+    # If we have any text search terms, add them to the textsearch condition
+    if name_search_terms:
+        combined_terms = " ".join(name_search_terms)
+        where_conditions.append("textsearch @@ plainto_tsquery(${})")
+        query_params.append(combined_terms)
+    
+    # For birth year, use a direct JSON path query which is more reliable
+    if search_params.participant_birth_year is not None:
+        # Find organizations with a participant born in the specified year
+        where_conditions.append("""
+            EXISTS (
+                SELECT 1 FROM jsonb_array_elements(participations) as p
+                WHERE SUBSTRING(p->'participant'->>'birth_date', 1, 4) = ${}
+            )
+        """)
+        query_params.append(str(search_params.participant_birth_year))
+    
+    # Additional organization filters
+    additional_filters = [
+        ('jurisdiction', search_params.jurisdiction),
+        ('legal_form', search_params.legal_form),
+        ('status', search_params.status)
+    ]
+    
+    # Add additional filters
+    for column, value in additional_filters:
+        if value:
+            where_conditions.append(f"{column} = ${{}}")
+            query_params.append(value)
+    
+    async with pool.acquire() as conn:
+        try:
+            # Construct base query
+            query = "SELECT * FROM organization"
+            count_query = "SELECT COUNT(*) FROM organization"
+            
+            # Add WHERE conditions
+            if where_conditions:
+                # Dynamically number the placeholders
+                numbered_conditions = []
+                numbered_params = []
+                param_index = 1
+                
+                for condition in where_conditions:
+                    # Replace {} with actual parameter numbers
+                    numbered_condition = condition.format(*[param_index + i for i in range(condition.count('${}'))])
+                    numbered_conditions.append(numbered_condition)
+    
+                    # Add corresponding number of parameters
+                    param_count = condition.count('${}')
+                    numbered_params.extend(query_params[param_index-1:param_index-1+param_count])
+                    param_index += param_count
+                
+                where_clause = " WHERE " + " AND ".join(numbered_conditions)
+                query += where_clause
+                count_query += where_clause
+                
+                # Store the parameters for the WHERE conditions separately
+                count_params = numbered_params.copy()
+                query_params = numbered_params
+            else:
+                count_params = []
+            
+            # Add ordering
+            if name_search_terms:
+                query += f" ORDER BY ts_rank(textsearch, plainto_tsquery(${len(query_params) + 1})) DESC"
+                query_params.append(" ".join(name_search_terms))
+            else:
+                query += " ORDER BY name"
+            
+            # Add pagination
+            query += f" LIMIT ${len(query_params) + 1} OFFSET ${len(query_params) + 2}"
+            query_params.extend([limit, offset])
+            
+            # Print query for debugging
+            debug_query = query
+            for i, param in enumerate(query_params):
+                debug_query = debug_query.replace(f"${i+1}", f"'{param}'")
+            logger.debug(f"Executing query: {debug_query}")
+            
+            # Execute queries
+            query_start_time = time.time()
+            results = await conn.fetch(query, *query_params)
+            query_time = time.time() - query_start_time
+            
+            count_start_time = time.time()
+            total_count = await conn.fetchval(count_query, *count_params)
+            count_time = time.time() - count_start_time
+            
+            # Log performance metrics
+            total_time = time.time() - start_time
+            logger.info(
+                f"Search performance: "
+                f"Total={total_time:.3f}s, "
+                f"Query={query_time:.3f}s, "
+                f"Count={count_time:.3f}s, "
+                f"Results={len(results)}, "
+                f"ParamCount={len(query_params)}"
+            )
+            
+            return results, total_count
+        
+        except Exception as e:
+            logger.error(f"Search error: {str(e)}")
+            raise
 
+        
 async def search_organizations(
-    pool: asyncpg.Pool, 
+    pool: Pool, 
     search_params: SearchParams
 ) -> Tuple[List[Dict[str, Any]], int]:
     """

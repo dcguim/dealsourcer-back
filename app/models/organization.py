@@ -164,8 +164,15 @@ class SearchParams(BaseModel):
     jurisdiction: Optional[str] = None
     legal_form: Optional[str] = None
     status: Optional[str] = None
+    
+    # New participant-related fields
+    participant_name: Optional[str] = None
+    participant_birth_year: Optional[int] = None
+    participant_birth_year_range: Optional[int] = Field(2, ge=0, le=10)
+    
     limit: int = Field(10, ge=1, le=100)
     offset: int = Field(0, ge=0)
+
 
 class SearchResponse(BaseModel):
     """Model for the entire search response"""
@@ -173,6 +180,7 @@ class SearchResponse(BaseModel):
     total: Optional[int] = None
     limit: Optional[int] = None
     offset: Optional[int] = None
+
 
 class OrganizationBase(BaseModel):
     """Base Organization model with common fields"""
@@ -207,16 +215,16 @@ class OrganizationResponse(Organization):
     class Config:
         orm_mode = True
 
-class PaginatedResponse(BaseModel):
-    """Paginated response model"""
-    total: int
-    limit: int
-    offset: int
-    has_more: bool
-
 class StatsResponse(BaseModel):
     """Statistics response model"""
     total_organizations: int
     by_status: List[Dict[str, Any]]
     top_jurisdictions: List[Dict[str, Any]]
     top_legal_forms: List[Dict[str, Any]]
+
+class PaginatedResponse(BaseModel):
+    """Paginated response model"""
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
