@@ -12,6 +12,30 @@ BASE_URL = f"http://{API_HOST}:{API_PORT}"
 # Skip these tests if server is not available
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
+# Function to get auth token for tests
+def get_auth_token():
+    """Get an authentication token for API testing"""
+    # Use the development token endpoint that doesn't require email verification
+    try:
+        # Auth endpoints have the /api prefix
+        dev_token_response = requests.get(f"{BASE_URL}/api/dev-token")
+        
+        # If successful, return the token
+        if dev_token_response.status_code == 200:
+            return dev_token_response.json()["token"]
+        
+        # Fallback to test-token if dev-token fails
+        test_token_response = requests.get(f"{BASE_URL}/api/test-token")
+        if test_token_response.status_code == 200:
+            return test_token_response.json()["token"]
+        
+        # If we couldn't get a token, raise an exception
+        raise Exception(f"Failed to get auth token. Dev token status: {dev_token_response.status_code}, Test token status: {test_token_response.status_code}")
+    except Exception as e:
+        # Log the error and re-raise - tests should fail if we can't get a valid token
+        print(f"Failed to get auth token: {str(e)}")
+        raise
+
 @pytest.fixture(scope="module")
 def api_client():
     """Fixture for API testing client"""
@@ -22,13 +46,32 @@ def api_client():
     except (requests.ConnectionError, AssertionError) as e:
         pytest.skip(f"API server not available: {str(e)}")
     
+    # Get auth token for tests
+    auth_token = get_auth_token()
+    
     class APIClient:
         def search(self, **params):
             """Helper to make search requests with proper encoding"""
             # URL encode all parameters
             encoded_params = urllib.parse.urlencode(params)
             url = f"{BASE_URL}/search?{encoded_params}"
-            return requests.get(url)
+            # Include authorization header
+            headers = {"Authorization": f"Bearer {auth_token}"}
+            return requests.get(url, headers=headers)
+        
+        def get_organization(self, org_id):
+            """Helper to get organization details"""
+            url = f"{BASE_URL}/organization/{org_id}"
+            # Include authorization header
+            headers = {"Authorization": f"Bearer {auth_token}"}
+            return requests.get(url, headers=headers)
+        
+        def get_stats(self):
+            """Helper to get stats"""
+            url = f"{BASE_URL}/stats"
+            # Include authorization header
+            headers = {"Authorization": f"Bearer {auth_token}"}
+            return requests.get(url, headers=headers)
     
     return APIClient()
 

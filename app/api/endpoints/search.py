@@ -1,4 +1,4 @@
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Annotated
 from fastapi import APIRouter, Query, HTTPException, Depends
 from fastapi.logger import logger
 import asyncpg
@@ -7,6 +7,9 @@ import json
 from app.models import SearchParams, SearchResponse, PaginatedResponse, OrganizationResponse
 from app.core.dbconn import get_pool
 from app.services.search_service import search_organizations_advanced
+from app.core.security import oauth2_scheme, get_current_user
+import jwt
+from app.core.security import SECRET_KEY, ALGORITHM
 
 router = APIRouter()
 
@@ -35,8 +38,15 @@ def parse_json_fields(results):
 @router.get("/search", 
             response_model=None,  # Remove response_model to allow custom response
             summary="Search Organizations",
-            description="Search for organizations using various criteria")
+            description="Search for organizations using various criteria",
+            responses={
+                200: {"description": "Successful response with search results"},
+                401: {"description": "Not authenticated - valid JWT token required"},
+                400: {"description": "Bad request - search parameters invalid"}
+            })
 async def search_orgs(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    pool = Depends(get_pool),
     # Existing organization-level parameters
     name: Optional[str] = Query(None, description="Organization name", min_length=2, max_length=255),
     description: Optional[str] = Query(None, description="Description keywords", min_length=2, max_length=500),
@@ -51,8 +61,7 @@ async def search_orgs(
     
     # Pagination parameters
     limit: int = Query(10, description="Maximum number of results", ge=1, le=100),
-    offset: int = Query(0, description="Number of results to skip", ge=0),
-    pool = Depends(get_pool)
+    offset: int = Query(0, description="Number of results to skip", ge=0)
 ):
     """
     Search for organizations using comprehensive criteria.
@@ -63,6 +72,8 @@ async def search_orgs(
     
     Requires at least one search parameter to be provided.
     Returns a paginated list of organizations matching the search criteria.
+    
+    Requires authentication.
     
     Validation:
     - At least one search parameter must be non-null
@@ -78,6 +89,34 @@ async def search_orgs(
     - HTTPException 400 if no search parameters are provided
     - HTTPException 500 if database error occurs
     """
+    # Validate token and get user info
+    try:
+        # Decode the JWT token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Extract user data from payload
+        email = payload.get("email")
+        if email is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # User is authenticated at this point
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
     # Validate that at least one search parameter is provided
     if not any([
         name, description, jurisdiction, legal_form, status,

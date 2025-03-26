@@ -4,11 +4,13 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.openapi.utils import get_openapi
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.dbconn import create_connection_pool, close_connection_pool
 from app.api.routes import api_router
 from app.core.logging import logger
+from app.core.security import oauth2_scheme
 
 # Create FastAPI application
 app = FastAPI(
@@ -28,6 +30,40 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router)
+
+# Custom OpenAPI to include security scheme
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=settings.API_TITLE,
+        version=settings.API_VERSION,
+        description="Organization Search API with JWT authentication",
+        routes=app.routes,
+    )
+    
+    # Add security scheme component
+    if "components" not in openapi_schema:
+        openapi_schema["components"] = {}
+        
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT"
+        }
+    }
+    
+    # Don't set global security - let each endpoint handle it through dependencies
+    if "security" in openapi_schema:
+        del openapi_schema["security"]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+# Set custom OpenAPI schema
+app.openapi = custom_openapi
 
 # Exception handlers
 @app.exception_handler(StarletteHTTPException)
